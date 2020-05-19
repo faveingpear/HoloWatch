@@ -1,33 +1,33 @@
-import json
-import requests
-import webbrowser
 
-from kivy.app import App
+try:
+	from kivy.app import App
 
-from kivy.uix.label import Label
-from kivy.uix.gridlayout import GridLayout
-from kivy.uix.textinput import TextInput
-from kivy.uix.button import Button
-from kivy.uix.scrollview import ScrollView
-from kivy.core.window import Window
+	from kivy.uix.label import Label
+	from kivy.uix.gridlayout import GridLayout
+	from kivy.uix.textinput import TextInput
+	from kivy.uix.button import Button
+	from kivy.uix.scrollview import ScrollView
+	from kivy.core.window import Window
+	from kivy.uix.popup import Popup
+	from kivy.logger import Logger
+	from kivy.clock import Clock
+
+except Exception as e:
+	Logger.info('HoloWatch: Failed to import a kivy libary Error ' + str(e))
+
+
+
+try:
+	import json
+	import requests
+	import traceback
+except Exception as e:
+	Logger.info('HoloWatch: Failed to import a main libary Error ' + str(e))
 
 MOB_BUTTON_SIZE = 300
-STATUS_DATA_PATH = "test.json"
-
-TEST_JSON = """[
-    {
-        "name": "Matsuri",
-        "status":true,
-        "link":"https://www.youtube.com/watch?v=A9iBkUW_w_A",
-        "thumbnail":"https://www.youtube.com/watch?v=A9iBkUW_w_A"
-    },
-    {
-        "name": "Matsuri",
-        "status":false,
-        "link":null,
-        "thumbnail":null
-    }
-]"""
+SERVER_URL = "http://10.0.0.51:8000/"
+SERVER_PATH = "update.json"
+UPDATE_TIME = 600
 
 class StatusData():
 
@@ -37,13 +37,8 @@ class StatusData():
 		self.name = name
 
 	def getData(self):
-		if self.url == None:
-			
-			file = open(self.path,"r")
-
-			self.data = json.load(file)
-
-			file.close
+		r = requests.get(self.url + self.path)
+		self.data = r.json()
 
 class Streamer():
 
@@ -63,16 +58,28 @@ class Streamer():
 
 		container.add_widget(self.liveButton)
 
+	def updateStatus(self,status=None):
+		if status == None:
+			self.liveButton.text = str(self.isLive)
+		else:
+			self.liveButton.text = str(status)
+
+		Logger.info("HoloWatch: Updated status to " + str(status))
+
 	def openStream(self,instance):
 		if self.isLive:
 			print("Opening stream" + self.link)
-			webbrowser.open(self.link)
+			#webbrowser.open(self.link)
 		else:
 			print("Not live")
 
 class HoloWatch(App):
 
 	def build(self):
+		
+		Logger.info('HoloWatch: Starting main app')
+
+		Clock.schedule_interval(self.updateStatus, UPDATE_TIME)
 
 		self.streamers = []
 
@@ -80,7 +87,11 @@ class HoloWatch(App):
 		# Make sure the height is such that there is something to scroll.
 		layout.bind(minimum_height=layout.setter('height'))
 
-		data = json.loads(TEST_JSON)
+		Status = StatusData(SERVER_URL,SERVER_PATH)
+
+		Status.getData()
+
+		data = Status.data
 
 		for streamer in data:
 			self.streamers.append(Streamer(name=str(streamer['name']),isLive=streamer['status'],link=streamer['link'],thumbnail=streamer['thumbnail']))
@@ -93,5 +104,23 @@ class HoloWatch(App):
 
 		return root
 
+	def updateStatus(self,dt):
+
+		Logger.info("HoloWatch: Updating Status")
+
+		Status = StatusData(SERVER_URL,SERVER_PATH)
+
+		Status.getData()
+
+		data = Status.data
+
+		for i in range(len(data)):
+			self.streamers[i].isLive = data[i]['status']
+			self.streamers[i].updateStatus()
+
 if __name__ == "__main__":
-	HoloWatch().run()
+	try:
+		HoloWatch().run()
+	except Exception as e:
+
+		Logger.error('HoloWatch: Big Error ' + traceback.format_exc() + " " + str(e))

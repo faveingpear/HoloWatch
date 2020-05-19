@@ -1,1 +1,1 @@
-buildozer android debug deploy run
+buildozer android debug deploy run logcat > test.log
